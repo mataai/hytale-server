@@ -3,10 +3,10 @@ name: Publish Docker image
 on:
   push:
     branches:
-      - master
+      - main
       - development
     tags:
-      - 'v*'
+      - "v*"
     paths-ignore:
       - "*.md"
       - "docker-compose.yaml"
