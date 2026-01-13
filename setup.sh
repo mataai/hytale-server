@@ -26,7 +26,7 @@ else
         mkdir -p /hytale/server
     fi
 
-    /hytale/downloader/hytale-downloader-linux-amd64 -download-path /hytale/server
+    /hytale/downloader/hytale-downloader-linux-amd64 -download-path /hytale/server/server.zip
 fi
 
 if [ -f "/hytale/server/Server/HytaleServer.jar" ]; then
@@ -40,5 +40,16 @@ else
     exit 1
 fi
 
+if [ ! -f "/hytale/server/Assets.zip" ]; then
+    echo "${prefix} Assets.zip not found!"
+    exit 1
+fi
+
+if [ ! -d "/hytale/instance" ]; then
+    echo "${prefix} Creating instance directory..."
+    mkdir -p /hytale/instance
+fi
+
+cd /hytale/instance
 echo "${prefix} Starting Hytale server..."
-java -jar /hytale/server/Server/HytaleServer.jar --assets /hytale/server/Assets.zip
+java -jar /hytale/server/Server/HytaleServer.jar --assets /hytale/server/Assets.zip --boot-command "auth login device"
