@@ -1,0 +1,10 @@
+services:
+  hytale: 
+    image: ghcr.io/mataai/hytale-server:latest
+    container_name: hytale-server
+    ports:
+      - "5520:5520/udp"
+    volumes:
+      - ./hytale:/hytale
+    stdin_open: true
+    tty: true

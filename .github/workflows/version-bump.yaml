@@ -1,0 +1,101 @@
+name: Version Bump
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - master
+      - development
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Git config
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine version bump
+        id: bump
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          TARGET_BRANCH="${{ github.base_ref }}"
+          echo "Source branch: $BRANCH_NAME"
+          echo "Target branch: $TARGET_BRANCH"
+
+          # Default to none
+          LEVEL="none"
+
+          # Logic based on source branch
+          if [[ "$BRANCH_NAME" == feature/* ]] || [[ "$BRANCH_NAME" == feat/* ]]; then
+            LEVEL="minor"
+          elif [[ "$BRANCH_NAME" == fix/* ]] || [[ "$BRANCH_NAME" == hotfix/* ]] || [[ "$BRANCH_NAME" == bug/* ]] || [[ "$BRANCH_NAME" == bugfix/* ]]; then
+            LEVEL="patch"
+          elif [[ "$BRANCH_NAME" == release/* ]] || [[ "$BRANCH_NAME" == major/* ]]; then
+            LEVEL="major"
+          fi
+
+          # Override/Safety: If ensuring releases go to development, we might treat development merges as prereleases automatically via the tag-action configuration, 
+          # but the bump level (increment) is decided here.
+
+          echo "Determined bump level: $LEVEL"
+          echo "level=$LEVEL" >> $GITHUB_OUTPUT
+
+      - name: Bump version and push tag
+        if: steps.bump.outputs.level != 'none'
+        id: tag_version
+        run: |
+          git fetch --tags
+
+          # Get the latest stable tag
+          LAST_TAG=$(git describe --tags --match "v*.*.*" --abbrev=0 --exclude "*-*" 2>/dev/null || echo "v0.0.0")
+          echo "Latest stable tag: $LAST_TAG"
+
+          # Remove 'v'
+          VERSION=${LAST_TAG#v}
+          IFS='.' read -r -a PARTS <<< "$VERSION"
+          MAJOR=${PARTS[0]}
+          MINOR=${PARTS[1]}
+          PATCH=${PARTS[2]}
+
+          LEVEL="${{ steps.bump.outputs.level }}"
+
+          if [[ "$LEVEL" == "major" ]]; then
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+          elif [[ "$LEVEL" == "minor" ]]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          elif [[ "$LEVEL" == "patch" ]]; then
+            PATCH=$((PATCH + 1))
+          fi
+
+          NEW_TAG="v$MAJOR.$MINOR.$PATCH"
+
+          # Add beta suffix for development branch
+          if [[ "${{ github.base_ref }}" == "development" ]]; then
+             # Using timestamp to ensure uniqueness for betas
+             NEW_TAG="${NEW_TAG}-beta.$(date +%s)"
+          fi
+
+          echo "Generated Version: $NEW_TAG"
+
+          git tag $NEW_TAG
+          git push origin $NEW_TAG
+
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
+      - name: Output new version
+        if: steps.bump.outputs.level != 'none'
+        run: |
+          echo "New version: ${{ steps.tag_version.outputs.new_tag }}"
